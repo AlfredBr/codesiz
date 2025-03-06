@@ -208,6 +208,7 @@ func main() {
 				// Print each excluded file with its line count.
 				fmt.Printf(" - %s: %d lines\n", fd.Path, fd.LineCount)
 			}
+			fmt.Println()
 		}
 	}
 
@@ -303,6 +304,33 @@ func main() {
 	}
 	fmt.Printf("Smallest file: %s (%d lines)\n", smallest.Path, smallest.LineCount)
 	fmt.Printf("Largest file: %s (%d lines)\n", largest.Path, largest.LineCount)
+
+	// NEW: Compute file clusters based on line counts.
+	{
+		sortedFiles := make([]FileData, len(files))
+		copy(sortedFiles, files)
+		sort.Slice(sortedFiles, func(i, j int) bool { return sortedFiles[i].LineCount < sortedFiles[j].LineCount })
+		n := len(sortedFiles)
+		if n > 0 {
+			// Determine cluster thresholds at 1/3 and 2/3 indices.
+			thresh1 := sortedFiles[n/3].LineCount
+			thresh2 := sortedFiles[(2*n)/3].LineCount
+			smallCount, mediumCount, largeCount := 0, 0, 0
+			for _, fd := range files {
+				if fd.LineCount <= thresh1 {
+					smallCount++
+				} else if fd.LineCount <= thresh2 {
+					mediumCount++
+				} else {
+					largeCount++
+				}
+			}
+			fmt.Printf("\nFile clusters:\n")
+			fmt.Printf(" Small files (less than %d lines): %d files\n", thresh1, smallCount)
+			fmt.Printf(" Medium files (less than %d lines): %d files\n", thresh2, mediumCount)
+			fmt.Printf(" Large files (greater than %d lines): %d files\n", thresh2, largeCount)
+		}
+	}
 
 	// Print detailed file list according to flags
 	if *histogram {
