@@ -305,31 +305,93 @@ func main() {
 	fmt.Printf("Smallest file: %s (%d lines)\n", smallest.Path, smallest.LineCount)
 	fmt.Printf("Largest file: %s (%d lines)\n", largest.Path, largest.LineCount)
 
-	// Compute file clusters based on line counts.
+	// NEW: Compute file clusters using k-means clustering (k=3) on file line counts.
 	{
-		// Create a sorted copy for clustering.
-		clusterFiles := make([]FileData, len(files))
-		copy(clusterFiles, files)
-		sort.Slice(clusterFiles, func(i, j int) bool { return clusterFiles[i].LineCount < clusterFiles[j].LineCount })
-		n := len(clusterFiles)
-		if n > 0 {
-			// Determine thresholds at roughly 1/3 and 2/3 quantiles.
-			thresh1 := clusterFiles[n/3].LineCount
-			thresh2 := clusterFiles[(2*n)/3].LineCount
-			smallCount, mediumCount, largeCount := 0, 0, 0
-			for _, fd := range clusterFiles {
-				if fd.LineCount <= thresh1 {
-					smallCount++
-				} else if fd.LineCount <= thresh2 {
-					mediumCount++
-				} else {
-					largeCount++
+		n := len(files)
+		if n >= 3 {
+			k := 3
+			data := make([]float64, n)
+			for i, fd := range files {
+				data[i] = float64(fd.LineCount)
+			}
+			// Initialize centroids using the sorted data: min, median, and max.
+			sortedData := make([]float64, n)
+			copy(sortedData, data)
+			sort.Float64s(sortedData)
+			centroids := []float64{sortedData[0], sortedData[n/2], sortedData[n-1]}
+			assignments := make([]int, n)
+			// Run k-means for a fixed number of iterations.
+			for iter := 0; iter < 10; iter++ {
+				changed := false
+				// Assignment step.
+				for i, x := range data {
+					best := 0
+					bestDist := math.Abs(x - centroids[0])
+					for j := 1; j < k; j++ {
+						d := math.Abs(x - centroids[j])
+						if d < bestDist {
+							bestDist = d
+							best = j
+						}
+					}
+					if assignments[i] != best {
+						assignments[i] = best
+						changed = true
+					}
+				}
+				// Update step.
+				newCentroids := make([]float64, k)
+				counts := make([]int, k)
+				for i, cluster := range assignments {
+					newCentroids[cluster] += data[i]
+					counts[cluster]++
+				}
+				for j := 0; j < k; j++ {
+					if counts[j] > 0 {
+						newCentroids[j] /= float64(counts[j])
+					} else {
+						newCentroids[j] = centroids[j]
+					}
+				}
+				centroids = newCentroids
+				if !changed {
+					break
 				}
 			}
-			fmt.Printf("\nFile clusters:\n")
-			fmt.Printf(" Small files (0-%d lines): %d files\n", thresh1-1, smallCount)
-			fmt.Printf(" Medium files (%d-%d lines): %d files\n", thresh1, thresh2-1, mediumCount)
-			fmt.Printf(" Large files (%d+ lines): %d files\n", thresh2, largeCount)
+			// Prepare summaries for each cluster.
+			type clusterSummary struct {
+				Count int
+				Sum   float64
+				Min   float64
+				Max   float64
+			}
+			summaries := make([]clusterSummary, k)
+			for j := 0; j < k; j++ {
+				summaries[j].Min = 1e9
+				summaries[j].Max = -1
+			}
+			for i, cluster := range assignments {
+				x := data[i]
+				summaries[cluster].Count++
+				summaries[cluster].Sum += x
+				if x < summaries[cluster].Min {
+					summaries[cluster].Min = x
+				}
+				if x > summaries[cluster].Max {
+					summaries[cluster].Max = x
+				}
+			}
+			fmt.Println("\nFile clusters (k-means clustering, k=3):")
+			for j := 0; j < k; j++ {
+				avgCluster := 0.0
+				if summaries[j].Count > 0 {
+					avgCluster = summaries[j].Sum / float64(summaries[j].Count)
+				}
+				fmt.Printf(" Cluster %d: %d files, Avg = %.2f, Range = [%.0f, %.0f] lines\n",
+					j+1, summaries[j].Count, avgCluster, summaries[j].Min, summaries[j].Max)
+			}
+		} else {
+			fmt.Println("\nNot enough files for clustering.")
 		}
 	}
 
