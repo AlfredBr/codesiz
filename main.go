@@ -314,7 +314,7 @@ func main() {
 			for i, fd := range files {
 				data[i] = float64(fd.LineCount)
 			}
-			// Initialize centroids using the sorted data: min, median, and max.
+			// Initialize centroids using sorted data: min, median, and max.
 			sortedData := make([]float64, n)
 			copy(sortedData, data)
 			sort.Float64s(sortedData)
@@ -360,13 +360,16 @@ func main() {
 			}
 			// Prepare summaries for each cluster.
 			type clusterSummary struct {
-				Count int
-				Sum   float64
-				Min   float64
-				Max   float64
+				Cluster int
+				Count   int
+				Sum     float64
+				Min     float64
+				Max     float64
+				Avg     float64
 			}
 			summaries := make([]clusterSummary, k)
 			for j := 0; j < k; j++ {
+				summaries[j].Cluster = j
 				summaries[j].Min = 1e9
 				summaries[j].Max = -1
 			}
@@ -381,14 +384,26 @@ func main() {
 					summaries[cluster].Max = x
 				}
 			}
+			totalFiles := float64(n)
+			for j := 0; j < k; j++ {
+				if summaries[j].Count > 0 {
+					summaries[j].Avg = summaries[j].Sum / float64(summaries[j].Count)
+				}
+			}
+			// Sort cluster summaries by average to determine labels.
+			sortedSums := make([]clusterSummary, k)
+			copy(sortedSums, summaries)
+			sort.Slice(sortedSums, func(i, j int) bool { return sortedSums[i].Avg < sortedSums[j].Avg })
+			// Map each original cluster index to a label.
+			labels := map[int]string{}
+			labels[sortedSums[0].Cluster] = "Small"
+			labels[sortedSums[1].Cluster] = "Medium"
+			labels[sortedSums[2].Cluster] = "Large"
 			fmt.Println("\nFile clusters (k-means clustering, k=3):")
 			for j := 0; j < k; j++ {
-				avgCluster := 0.0
-				if summaries[j].Count > 0 {
-					avgCluster = summaries[j].Sum / float64(summaries[j].Count)
-				}
-				fmt.Printf(" Cluster %d: %d files, Avg = %.2f, Range = [%.0f, %.0f] lines\n",
-					j+1, summaries[j].Count, avgCluster, summaries[j].Min, summaries[j].Max)
+				percent := 100.0 * float64(summaries[j].Count) / totalFiles
+				fmt.Printf(" %s: %d files (%.2f%%), Avg = %.2f lines, Range = [%.0f, %.0f] lines\n",
+					labels[j], summaries[j].Count, percent, summaries[j].Avg, summaries[j].Min, summaries[j].Max)
 			}
 		} else {
 			fmt.Println("\nNot enough files for clustering.")
