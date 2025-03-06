@@ -16,5 +16,13 @@
         ".py",
         ".swift",
         ".ps1"
+    ],
+    "exclusions": [
+        ".exe",
+        ".bin",
+        ".obj",
+        ".o",
+        ".dll",
+		".g.cs"
     ]
 }

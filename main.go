@@ -16,6 +16,7 @@ import (
 
 type Config struct {
 	Extensions []string `json:"extensions"`
+	Exclusions []string `json:"exclusions"`
 }
 
 type FileData struct {
@@ -59,7 +60,7 @@ func computeStats(sizes []int) (avg float64, median float64, stdHigh float64, st
 	}
 	avg = float64(sum) / float64(len(sizes))
 
-	// sorting for median
+	// Sorting for median
 	sorted := make([]int, len(sizes))
 	copy(sorted, sizes)
 	sort.Ints(sorted)
@@ -70,7 +71,7 @@ func computeStats(sizes []int) (avg float64, median float64, stdHigh float64, st
 		median = float64(sorted[n/2])
 	}
 
-	// compute standard deviations separately for files above and below average
+	// Compute standard deviations separately for files above and below average
 	var varianceHighSum float64
 	var countHigh int
 	var varianceLowSum float64
@@ -102,9 +103,9 @@ func main() {
 	allFiles := flag.Bool("a", false, "all files, not just source code")
 	helpFlag := flag.Bool("?", false, "print help")
 	configPath := flag.String("config", "languages.json", "config file with file extensions")
-	jsonOutput := flag.Bool("j", false, "save output as JSON to file")                 // NEW flag
-	includeLang := flag.String("i", "", "include only this language type (extension)") // NEW flag
-	excludeLang := flag.String("e", "", "exclude this language type (extension)")      // NEW flag
+	jsonOutput := flag.Bool("j", false, "save output as JSON to file")
+	includeLang := flag.String("i", "", "include only this language type (extension)")
+	excludeLang := flag.String("e", "", "exclude this language type (extension)")
 	flag.Parse()
 
 	// If help flag is provided, print usage and exit
@@ -119,7 +120,7 @@ func main() {
 	}
 	root := flag.Arg(0)
 
-	// NEW: Process language filtering flags
+	// Process language filtering flags
 	allowed := make(map[string]bool)
 	if *includeLang != "" {
 		inc := strings.ToLower(*includeLang)
@@ -133,18 +134,20 @@ func main() {
 		if err != nil {
 			log.Fatalf("Unable to load config: %v", err)
 		}
+		// Add allowed extensions from config.Extensions
 		for _, ext := range config.Extensions {
 			allowed[strings.ToLower(ext)] = true
+		}
+		// Remove exclusions from the allowed list
+		for _, exc := range config.Exclusions {
+			allowed[strings.ToLower(exc)] = false // or simply delete below
+			delete(allowed, strings.ToLower(exc))
 		}
 		// Process exclude flag only if include flag is not specified
 		if *excludeLang != "" {
 			exc := strings.ToLower(*excludeLang)
 			if !strings.HasPrefix(exc, ".") {
 				exc = "." + exc
-			}
-			// NEW: Check if the language to exclude is defined in languages.json
-			if !allowed[exc] {
-				log.Fatalf("Excluded language %s is not defined in languages.json", exc)
 			}
 			delete(allowed, exc)
 		}
@@ -159,8 +162,15 @@ func main() {
 			return nil
 		}
 		if !*allFiles {
-			ext := strings.ToLower(filepath.Ext(d.Name()))
-			if ext == "" || !allowed[ext] {
+			lowerName := strings.ToLower(d.Name())
+			match := false
+			for ext := range allowed {
+				if strings.HasSuffix(lowerName, ext) {
+					match = true
+					break
+				}
+			}
+			if !match {
 				return nil
 			}
 		}
@@ -180,7 +190,7 @@ func main() {
 		return
 	}
 
-	// compute overall stats
+	// Compute overall stats
 	sizes := make([]int, len(files))
 	smallest := files[0]
 	largest := files[0]
@@ -195,13 +205,13 @@ func main() {
 	}
 	avg, median, stdHigh, stdLow := computeStats(sizes)
 
-	// NEW: Compute sum total lines (only for non-all-files mode)
+	// Compute sum total lines (only for non-all-files mode)
 	sumTotal := 0
 	for _, count := range sizes {
 		sumTotal += count
 	}
 
-	// NEW: JSON output handling
+	// JSON output handling
 	if *jsonOutput {
 		output := struct {
 			TotalFiles   int        `json:"total_files"`
@@ -255,7 +265,7 @@ func main() {
 		return
 	}
 
-	// display results
+	// Display results
 	fmt.Printf("Total files analyzed: %d\n", len(files))
 	fmt.Printf("Average lines: %.2f\n", avg)
 	fmt.Printf("Median lines: %.2f\n", median)
@@ -282,7 +292,7 @@ func main() {
 		} else {
 			outputFiles = files
 		}
-		// NEW: Compute max width for file paths for alignment
+		// Compute max width for file paths for alignment
 		maxPathLen := 0
 		for _, fd := range outputFiles {
 			if len(fd.Path) > maxPathLen {
