@@ -100,12 +100,11 @@ func main() {
 	sorted := flag.Bool("s", false, "detailed sorted output (smallest to largest)")
 	histogram := flag.Bool("h", false, "detailed histogram output (graphical)")
 	allFiles := flag.Bool("a", false, "all files, not just source code")
-	// NEW: Add help flag -? switch
 	helpFlag := flag.Bool("?", false, "print help")
 	configPath := flag.String("config", "languages.json", "config file with file extensions")
 	flag.Parse()
 
-	// NEW: If help flag is provided, print usage and exit
+	// If help flag is provided, print usage and exit
 	if *helpFlag {
 		flag.Usage()
 		return
