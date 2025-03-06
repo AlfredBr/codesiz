@@ -25,6 +25,15 @@ type FileData struct {
 	LineCount int
 }
 
+type ClusterSummary struct {
+	Cluster int
+	Count   int
+	Sum     float64
+	Min     float64
+	Max     float64
+	Avg     float64
+}
+
 func loadConfig(path string) (*Config, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -143,18 +152,9 @@ func runKMeans(data []float64, k int) (assignments []int, centroids []float64) {
 	return
 }
 
-type clusterSummary struct {
-	Cluster int
-	Count   int
-	Sum     float64
-	Min     float64
-	Max     float64
-	Avg     float64
-}
-
 // computeClusterSummaries computes summaries from the data and cluster assignments.
-func computeClusterSummaries(data []float64, assignments []int, k int) []clusterSummary {
-	summaries := make([]clusterSummary, k)
+func computeClusterSummaries(data []float64, assignments []int, k int) []ClusterSummary {
+	summaries := make([]ClusterSummary, k)
 	for j := 0; j < k; j++ {
 		summaries[j].Min = 1e9
 		summaries[j].Max = -1
@@ -180,7 +180,7 @@ func computeClusterSummaries(data []float64, assignments []int, k int) []cluster
 }
 
 // labelClusters returns a map from cluster index to label based on average value.
-func labelClusters(summaries []clusterSummary) map[int]string {
+func labelClusters(summaries []ClusterSummary) map[int]string {
 	k := len(summaries)
 	type idxAvg struct {
 		Index int
@@ -199,7 +199,7 @@ func labelClusters(summaries []clusterSummary) map[int]string {
 	return labels
 }
 
-// ----- Main Function -----
+// Main Function
 func main() {
 	// Define flags
 	detailed := flag.Bool("l", false, "detailed output")
