@@ -1,6 +1,6 @@
 # codesiz
 
-codesiz is a command-line utility written in Go that analyzes source code files.
+codesiz is a command-line utility written in Go that analyzes source code file lengths.
 
 ![Codesiz](./codesiz.png)
 
