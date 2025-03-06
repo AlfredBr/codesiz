@@ -190,20 +190,23 @@ func main() {
 		log.Fatalf("Error walking the path %q: %v", root, err)
 	}
 
-	// NEW: Exclude the largest n files if -k is provided.
+	// Exclude the largest n files if -k is provided.
 	var excludedFiles []FileData
 	if *kFlag > 0 {
-		sort.Slice(files, func(i, j int) bool { return files[i].LineCount > files[j].LineCount })
+		// sort files smallest to largest so that largest files are at the end
+		sort.Slice(files, func(i, j int) bool { return files[i].LineCount < files[j].LineCount })
 		if *kFlag >= len(files) {
-			fmt.Println("Excluding all files (largest files).")
+			fmt.Printf("Excluding %d file(s) (largest files).\n", len(files))
 			excludedFiles = files
 			files = []FileData{}
 		} else {
-			excludedFiles = files[:*kFlag]
-			files = files[*kFlag:]
-			fmt.Println("Excluding largest files:")
+			n := *kFlag
+			excludedFiles = files[len(files)-n:]
+			files = files[:len(files)-n]
+			fmt.Printf("Excluding %d largest file(s):\n", len(excludedFiles))
 			for _, fd := range excludedFiles {
-				fmt.Println(" -", fd.Path)
+				// Print each excluded file with its line count.
+				fmt.Printf(" - %s: %d lines\n", fd.Path, fd.LineCount)
 			}
 		}
 	}
