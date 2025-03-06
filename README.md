@@ -14,6 +14,9 @@ codesiz is a command-line utility written in Go that analyzes source code file l
   - `-h` for a graphical histogram representation.
   - `-a` to analyze all files (not just those matching configured extensions).
   - `-j` for JSON output of the analysis results.
+- Language filtering options:
+  - `-i` to include only a specific language type (ignores languages.json).
+  - `-e` to exclude a specific language file type as defined in languages.json.
   - `-?` help / usage information.
 
 ## Building

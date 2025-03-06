@@ -102,7 +102,9 @@ func main() {
 	allFiles := flag.Bool("a", false, "all files, not just source code")
 	helpFlag := flag.Bool("?", false, "print help")
 	configPath := flag.String("config", "languages.json", "config file with file extensions")
-	jsonOutput := flag.Bool("j", false, "save output as JSON to file") // NEW flag
+	jsonOutput := flag.Bool("j", false, "save output as JSON to file")                 // NEW flag
+	includeLang := flag.String("i", "", "include only this language type (extension)") // NEW flag
+	excludeLang := flag.String("e", "", "exclude this language type (extension)")      // NEW flag
 	flag.Parse()
 
 	// If help flag is provided, print usage and exit
@@ -117,19 +119,35 @@ func main() {
 	}
 	root := flag.Arg(0)
 
-	// load configuration
-	config, err := loadConfig(*configPath)
-	if err != nil {
-		log.Fatalf("Unable to load config: %v", err)
-	}
+	// NEW: Process language filtering flags
 	allowed := make(map[string]bool)
-	for _, ext := range config.Extensions {
-		allowed[strings.ToLower(ext)] = true
+	if *includeLang != "" {
+		inc := strings.ToLower(*includeLang)
+		if !strings.HasPrefix(inc, ".") {
+			inc = "." + inc
+		}
+		allowed[inc] = true
+	} else {
+		// load configuration
+		config, err := loadConfig(*configPath)
+		if err != nil {
+			log.Fatalf("Unable to load config: %v", err)
+		}
+		for _, ext := range config.Extensions {
+			allowed[strings.ToLower(ext)] = true
+		}
+		// Process exclude flag only if include flag is not specified
+		if *excludeLang != "" {
+			exc := strings.ToLower(*excludeLang)
+			if !strings.HasPrefix(exc, ".") {
+				exc = "." + exc
+			}
+			delete(allowed, exc)
+		}
 	}
 
 	var files []FileData
-	var walkErr error
-	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	if err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -149,12 +167,8 @@ func main() {
 		}
 		files = append(files, FileData{Path: path, LineCount: lines})
 		return nil
-	})
-	if err != nil {
-		walkErr = err
-	}
-	if walkErr != nil {
-		log.Fatalf("Error walking the path %q: %v", root, walkErr)
+	}); err != nil {
+		log.Fatalf("Error walking the path %q: %v", root, err)
 	}
 
 	if len(files) == 0 {
