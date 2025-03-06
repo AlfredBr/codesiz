@@ -9,6 +9,7 @@ codesiz is a command-line utility written in Go that analyzes source code file l
 - Configurable file extensions via an external JSON configuration.
 - Computes statistics such as total files, total lines, average lines, median lines, largest/smallest file size, and standard deviations.
 - Output options:
+  - `-?` help / usage information.
   - `-l` for detailed listing.
   - `-s` for sorted output (smallest to largest).
   - `-h` for a graphical histogram representation.
@@ -17,7 +18,6 @@ codesiz is a command-line utility written in Go that analyzes source code file l
 - Language filtering options:
   - `-i` to include only a specific language type (ignores languages.json).
   - `-e` to exclude a specific language file type as defined in languages.json.
-  - `-?` help / usage information.
 
 ## Building
 
