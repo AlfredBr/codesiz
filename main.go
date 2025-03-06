@@ -14,6 +14,7 @@ import (
 	"strings"
 )
 
+// Types and Helper Functions
 type Config struct {
 	Extensions []string `json:"extensions"`
 	Exclusions []string `json:"exclusions"`
@@ -53,7 +54,7 @@ func computeStats(sizes []int) (avg float64, median float64, stdHigh float64, st
 	if len(sizes) == 0 {
 		return 0, 0, 0, 0
 	}
-
+	// Compute average and median
 	var sum int
 	for _, s := range sizes {
 		sum += s
@@ -95,6 +96,110 @@ func computeStats(sizes []int) (avg float64, median float64, stdHigh float64, st
 	return
 }
 
+// runKMeans performs k-means clustering on float64 data with fixed iterations.
+func runKMeans(data []float64, k int) (assignments []int, centroids []float64) {
+	n := len(data)
+	// Initialize centroids using min, median and max of sorted data.
+	sortedData := make([]float64, n)
+	copy(sortedData, data)
+	sort.Float64s(sortedData)
+	centroids = []float64{sortedData[0], sortedData[n/2], sortedData[n-1]}
+	assignments = make([]int, n)
+	for iter := 0; iter < 10; iter++ {
+		changed := false
+		for i, x := range data {
+			best := 0
+			bestDist := math.Abs(x - centroids[0])
+			for j := 1; j < k; j++ {
+				d := math.Abs(x - centroids[j])
+				if d < bestDist {
+					bestDist = d
+					best = j
+				}
+			}
+			if assignments[i] != best {
+				assignments[i] = best
+				changed = true
+			}
+		}
+		newCentroids := make([]float64, k)
+		counts := make([]int, k)
+		for i, cluster := range assignments {
+			newCentroids[cluster] += data[i]
+			counts[cluster]++
+		}
+		for j := 0; j < k; j++ {
+			if counts[j] > 0 {
+				newCentroids[j] /= float64(counts[j])
+			} else {
+				newCentroids[j] = centroids[j]
+			}
+		}
+		centroids = newCentroids
+		if !changed {
+			break
+		}
+	}
+	return
+}
+
+type clusterSummary struct {
+	Cluster int
+	Count   int
+	Sum     float64
+	Min     float64
+	Max     float64
+	Avg     float64
+}
+
+// computeClusterSummaries computes summaries from the data and cluster assignments.
+func computeClusterSummaries(data []float64, assignments []int, k int) []clusterSummary {
+	summaries := make([]clusterSummary, k)
+	for j := 0; j < k; j++ {
+		summaries[j].Min = 1e9
+		summaries[j].Max = -1
+		summaries[j].Cluster = j
+	}
+	for i, cluster := range assignments {
+		x := data[i]
+		summaries[cluster].Count++
+		summaries[cluster].Sum += x
+		if x < summaries[cluster].Min {
+			summaries[cluster].Min = x
+		}
+		if x > summaries[cluster].Max {
+			summaries[cluster].Max = x
+		}
+	}
+	for j := 0; j < k; j++ {
+		if summaries[j].Count > 0 {
+			summaries[j].Avg = summaries[j].Sum / float64(summaries[j].Count)
+		}
+	}
+	return summaries
+}
+
+// labelClusters returns a map from cluster index to label based on average value.
+func labelClusters(summaries []clusterSummary) map[int]string {
+	k := len(summaries)
+	type idxAvg struct {
+		Index int
+		Avg   float64
+	}
+	idxs := make([]idxAvg, k)
+	for j := 0; j < k; j++ {
+		idxs[j] = idxAvg{Index: j, Avg: summaries[j].Avg}
+	}
+	sort.Slice(idxs, func(i, j int) bool { return idxs[i].Avg < idxs[j].Avg })
+	labels := map[int]string{
+		idxs[0].Index: "Small",
+		idxs[1].Index: "Medium",
+		idxs[2].Index: "Large",
+	}
+	return labels
+}
+
+// ----- Main Function -----
 func main() {
 	// Define flags
 	detailed := flag.Bool("l", false, "detailed output")
@@ -238,137 +343,55 @@ func main() {
 		sumTotal += count
 	}
 
-	// JSON output handling
-	if *jsonOutput {
-		// NEW: Compute cluster results for JSON output.
-		var clusterResults []struct {
+	// Compute clusters once using k-means if possible.
+	var clusterResults []struct {
+		Label      string     `json:"label"`
+		Count      int        `json:"count"`
+		Percentage float64    `json:"percentage"`
+		Avg        float64    `json:"avg"`
+		Range      [2]float64 `json:"range"`
+	}
+	if len(files) >= 3 {
+		k := 3
+		n := len(files)
+		data := make([]float64, n)
+		for i, fd := range files {
+			data[i] = float64(fd.LineCount)
+		}
+		assignments, _ := runKMeans(data, k)
+		summaries := computeClusterSummaries(data, assignments, k)
+		labels := labelClusters(summaries)
+		clusterResults = make([]struct {
 			Label      string     `json:"label"`
 			Count      int        `json:"count"`
 			Percentage float64    `json:"percentage"`
 			Avg        float64    `json:"avg"`
 			Range      [2]float64 `json:"range"`
-		}
-		if len(files) >= 3 {
-			k := 3
-			n := len(files)
-			data := make([]float64, n)
-			for i, fd := range files {
-				data[i] = float64(fd.LineCount)
+		}, k)
+		for j := 0; j < k; j++ {
+			avgVal := 0.0
+			if summaries[j].Count > 0 {
+				avgVal = summaries[j].Sum / float64(summaries[j].Count)
 			}
-			// Initialize centroids using sorted data: min, median, and max.
-			sortedData := make([]float64, n)
-			copy(sortedData, data)
-			sort.Float64s(sortedData)
-			centroids := []float64{sortedData[0], sortedData[n/2], sortedData[n-1]}
-			assignments := make([]int, n)
-			for iter := 0; iter < 10; iter++ {
-				changed := false
-				// Assignment step.
-				for i, x := range data {
-					best := 0
-					bestDist := math.Abs(x - centroids[0])
-					for j := 1; j < k; j++ {
-						d := math.Abs(x - centroids[j])
-						if d < bestDist {
-							bestDist = d
-							best = j
-						}
-					}
-					if assignments[i] != best {
-						assignments[i] = best
-						changed = true
-					}
-				}
-				// Update step.
-				newCentroids := make([]float64, k)
-				counts := make([]int, k)
-				for i, cluster := range assignments {
-					newCentroids[cluster] += data[i]
-					counts[cluster]++
-				}
-				for j := 0; j < k; j++ {
-					if counts[j] > 0 {
-						newCentroids[j] /= float64(counts[j])
-					} else {
-						newCentroids[j] = centroids[j]
-					}
-				}
-				centroids = newCentroids
-				if !changed {
-					break
-				}
-			}
-			// Prepare summaries for each cluster.
-			type cs struct {
-				Count int
-				Sum   float64
-				Min   float64
-				Max   float64
-			}
-			summaries := make([]cs, k)
-			for j := 0; j < k; j++ {
-				summaries[j].Min = 1e9
-				summaries[j].Max = -1
-			}
-			for i, cluster := range assignments {
-				x := data[i]
-				summaries[cluster].Count++
-				summaries[cluster].Sum += x
-				if x < summaries[cluster].Min {
-					summaries[cluster].Min = x
-				}
-				if x > summaries[cluster].Max {
-					summaries[cluster].Max = x
-				}
-			}
-			// Determine labelling by sorting clusters by average.
-			type idxAvg struct {
-				Index int
-				Avg   float64
-			}
-			idxs := make([]idxAvg, k)
-			for j := 0; j < k; j++ {
-				avgVal := 0.0
-				if summaries[j].Count > 0 {
-					avgVal = summaries[j].Sum / float64(summaries[j].Count)
-				}
-				idxs[j] = idxAvg{Index: j, Avg: avgVal}
-			}
-			sort.Slice(idxs, func(i, j int) bool { return idxs[i].Avg < idxs[j].Avg })
-			labels := map[int]string{
-				idxs[0].Index: "Small",
-				idxs[1].Index: "Medium",
-				idxs[2].Index: "Large",
-			}
-			clusterResults = make([]struct {
+			perc := 100.0 * float64(summaries[j].Count) / float64(n)
+			clusterResults[j] = struct {
 				Label      string     `json:"label"`
 				Count      int        `json:"count"`
 				Percentage float64    `json:"percentage"`
 				Avg        float64    `json:"avg"`
 				Range      [2]float64 `json:"range"`
-			}, k)
-			for j := 0; j < k; j++ {
-				avgVal := 0.0
-				if summaries[j].Count > 0 {
-					avgVal = summaries[j].Sum / float64(summaries[j].Count)
-				}
-				perc := 100.0 * float64(summaries[j].Count) / float64(n)
-				clusterResults[j] = struct {
-					Label      string     `json:"label"`
-					Count      int        `json:"count"`
-					Percentage float64    `json:"percentage"`
-					Avg        float64    `json:"avg"`
-					Range      [2]float64 `json:"range"`
-				}{
-					Label:      labels[j],
-					Count:      summaries[j].Count,
-					Percentage: perc,
-					Avg:        math.Round(avgVal),
-					Range:      [2]float64{math.Round(summaries[j].Min), math.Round(summaries[j].Max)},
-				}
+			}{
+				Label:      labels[j],
+				Count:      summaries[j].Count,
+				Percentage: perc,
+				Avg:        math.Round(avgVal),
+				Range:      [2]float64{math.Round(summaries[j].Min), math.Round(summaries[j].Max)},
 			}
 		}
+	}
 
+	// JSON Output section.
+	if *jsonOutput {
 		output := struct {
 			TotalFiles   int         `json:"total_files"`
 			Average      float64     `json:"average"`
@@ -396,15 +419,12 @@ func main() {
 			}(),
 			Files: func() []FileData {
 				if *detailed || *sorted {
-					var jsonFiles []FileData
+					jsonFiles := make([]FileData, len(files))
+					copy(jsonFiles, files)
 					if *sorted {
-						jsonFiles = make([]FileData, len(files))
-						copy(jsonFiles, files)
 						sort.Slice(jsonFiles, func(i, j int) bool {
 							return jsonFiles[i].LineCount < jsonFiles[j].LineCount
 						})
-					} else {
-						jsonFiles = files
 					}
 					return jsonFiles
 				}
@@ -440,112 +460,20 @@ func main() {
 	fmt.Printf("Smallest file: %s (%d lines)\n", smallest.Path, smallest.LineCount)
 	fmt.Printf("Largest file: %s (%d lines)\n", largest.Path, largest.LineCount)
 
-	// NEW: Compute file clusters using k-means clustering (k=3) on file line counts.
-	{
-		n := len(files)
-		if n >= 3 {
-			k := 3
-			data := make([]float64, n)
-			for i, fd := range files {
-				data[i] = float64(fd.LineCount)
-			}
-			// Initialize centroids using sorted data: min, median, and max.
-			sortedData := make([]float64, n)
-			copy(sortedData, data)
-			sort.Float64s(sortedData)
-			centroids := []float64{sortedData[0], sortedData[n/2], sortedData[n-1]}
-			assignments := make([]int, n)
-			// Run k-means for a fixed number of iterations.
-			for iter := 0; iter < 10; iter++ {
-				changed := false
-				// Assignment step.
-				for i, x := range data {
-					best := 0
-					bestDist := math.Abs(x - centroids[0])
-					for j := 1; j < k; j++ {
-						d := math.Abs(x - centroids[j])
-						if d < bestDist {
-							bestDist = d
-							best = j
-						}
-					}
-					if assignments[i] != best {
-						assignments[i] = best
-						changed = true
-					}
-				}
-				// Update step.
-				newCentroids := make([]float64, k)
-				counts := make([]int, k)
-				for i, cluster := range assignments {
-					newCentroids[cluster] += data[i]
-					counts[cluster]++
-				}
-				for j := 0; j < k; j++ {
-					if counts[j] > 0 {
-						newCentroids[j] /= float64(counts[j])
-					} else {
-						newCentroids[j] = centroids[j]
-					}
-				}
-				centroids = newCentroids
-				if !changed {
-					break
-				}
-			}
-			// Prepare summaries for each cluster.
-			type clusterSummary struct {
-				Cluster int
-				Count   int
-				Sum     float64
-				Min     float64
-				Max     float64
-				Avg     float64
-			}
-			summaries := make([]clusterSummary, k)
-			for j := 0; j < k; j++ {
-				summaries[j].Cluster = j
-				summaries[j].Min = 1e9
-				summaries[j].Max = -1
-			}
-			for i, cluster := range assignments {
-				x := data[i]
-				summaries[cluster].Count++
-				summaries[cluster].Sum += x
-				if x < summaries[cluster].Min {
-					summaries[cluster].Min = x
-				}
-				if x > summaries[cluster].Max {
-					summaries[cluster].Max = x
-				}
-			}
-			totalFiles := float64(n)
-			for j := 0; j < k; j++ {
-				if summaries[j].Count > 0 {
-					summaries[j].Avg = summaries[j].Sum / float64(summaries[j].Count)
-				}
-			}
-			// Sort cluster summaries by average to determine labels.
-			sortedSums := make([]clusterSummary, k)
-			copy(sortedSums, summaries)
-			sort.Slice(sortedSums, func(i, j int) bool { return sortedSums[i].Avg < sortedSums[j].Avg })
-			// Map each original cluster index to a label.
-			labels := map[int]string{}
-			labels[sortedSums[0].Cluster] = "Small"
-			labels[sortedSums[1].Cluster] = "Medium"
-			labels[sortedSums[2].Cluster] = "Large"
-			fmt.Println("\nFile clusters (k-means clustering, k=3):")
-			for j := 0; j < k; j++ {
-				percent := 100.0 * float64(summaries[j].Count) / totalFiles
-				fmt.Printf(" %s: %d files (%.2f%%), Avg = %.0f lines, Range = [%.0f, %.0f] lines\n",
-					labels[j], summaries[j].Count, percent, math.Round(summaries[j].Avg), summaries[j].Min, summaries[j].Max)
-			}
-		} else {
-			fmt.Println("\nNot enough files for clustering.")
+	// Compute file clusters using k-means clustering (k=3) on file line counts.
+	if len(files) >= 3 {
+		fmt.Println("\nFile clusters (k-means clustering, k=3):")
+		for j := 0; j < 3; j++ {
+			perc := 100.0 * float64(clusterResults[j].Count) / float64(len(files))
+			fmt.Printf(" %s: %d files (%.2f%%), Avg = %.0f lines, Range = [%.0f, %.0f] lines\n",
+				clusterResults[j].Label, clusterResults[j].Count, perc,
+				clusterResults[j].Avg, clusterResults[j].Range[0], clusterResults[j].Range[1])
 		}
+	} else {
+		fmt.Println("\nNot enough files for clustering.")
 	}
 
-	// Print detailed file list according to flags
+	// Detailed file listing (histogram/sorted/detailed)
 	if *histogram {
 		const barWidth = 50
 		maxLine := largest.LineCount
