@@ -307,16 +307,17 @@ func main() {
 
 	// NEW: Compute file clusters based on line counts.
 	{
-		sortedFiles := make([]FileData, len(files))
-		copy(sortedFiles, files)
-		sort.Slice(sortedFiles, func(i, j int) bool { return sortedFiles[i].LineCount < sortedFiles[j].LineCount })
-		n := len(sortedFiles)
+		// Create a sorted copy for clustering.
+		clusterFiles := make([]FileData, len(files))
+		copy(clusterFiles, files)
+		sort.Slice(clusterFiles, func(i, j int) bool { return clusterFiles[i].LineCount < clusterFiles[j].LineCount })
+		n := len(clusterFiles)
 		if n > 0 {
-			// Determine cluster thresholds at 1/3 and 2/3 indices.
-			thresh1 := sortedFiles[n/3].LineCount
-			thresh2 := sortedFiles[(2*n)/3].LineCount
+			// Determine thresholds at roughly 1/3 and 2/3 quantiles.
+			thresh1 := clusterFiles[n/3].LineCount
+			thresh2 := clusterFiles[(2*n)/3].LineCount
 			smallCount, mediumCount, largeCount := 0, 0, 0
-			for _, fd := range files {
+			for _, fd := range clusterFiles {
 				if fd.LineCount <= thresh1 {
 					smallCount++
 				} else if fd.LineCount <= thresh2 {
@@ -326,9 +327,9 @@ func main() {
 				}
 			}
 			fmt.Printf("\nFile clusters:\n")
-			fmt.Printf(" Small files (less than %d lines): %d files\n", thresh1, smallCount)
-			fmt.Printf(" Medium files (less than %d lines): %d files\n", thresh2, mediumCount)
-			fmt.Printf(" Large files (greater than %d lines): %d files\n", thresh2, largeCount)
+			fmt.Printf(" Small files (0-%d lines): %d files\n", thresh1-1, smallCount)
+			fmt.Printf(" Medium files (%d-%d lines): %d files\n", thresh1, thresh2-1, mediumCount)
+			fmt.Printf(" Large files (%d+ lines): %d files\n", thresh2, largeCount)
 		}
 	}
 
