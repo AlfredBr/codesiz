@@ -292,13 +292,12 @@ func main() {
 		return
 	}
 
-	// Display results
+	// Display results (updated to round all line counts)
 	fmt.Printf("Total files analyzed: %d\n", len(files))
-	fmt.Printf("Average: %.2f lines\n", avg)
-	fmt.Printf("Median: %.2f lines\n", median)
-	fmt.Printf("Standard deviation (high): %.2f\n", stdHigh)
-	fmt.Printf("Standard deviation (low): %.2f\n", stdLow)
-	// Show sum total only when -a is not specified.
+	fmt.Printf("Average: %.0f lines\n", math.Round(avg))
+	fmt.Printf("Median: %.0f lines\n", math.Round(median))
+	fmt.Printf("Standard deviation (high): %.0f lines\n", math.Round(stdHigh))
+	fmt.Printf("Standard deviation (low): %.0f lines\n", math.Round(stdLow))
 	if !*allFiles {
 		fmt.Printf("Total sum: %d lines\n", sumTotal)
 	}
@@ -402,8 +401,8 @@ func main() {
 			fmt.Println("\nFile clusters (k-means clustering, k=3):")
 			for j := 0; j < k; j++ {
 				percent := 100.0 * float64(summaries[j].Count) / totalFiles
-				fmt.Printf(" %s: %d files (%.2f%%), Avg = %.2f lines, Range = [%.0f, %.0f] lines\n",
-					labels[j], summaries[j].Count, percent, summaries[j].Avg, summaries[j].Min, summaries[j].Max)
+				fmt.Printf(" %s: %d files (%.2f%%), Avg = %.0f lines, Range = [%.0f, %.0f] lines\n",
+					labels[j], summaries[j].Count, percent, math.Round(summaries[j].Avg), summaries[j].Min, summaries[j].Max)
 			}
 		} else {
 			fmt.Println("\nNot enough files for clustering.")
