@@ -2,6 +2,8 @@
 
 codesiz is a command-line utility written in Go that analyzes source code files.
 
+![Codesiz](./codesiz.png)
+
 ## Features
 - Recursively scans directories for files.
 - Configurable file extensions via an external JSON configuration.
