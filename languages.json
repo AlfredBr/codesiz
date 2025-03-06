@@ -1,34 +1,34 @@
 {
-    "extensions": [
-        ".c",
-        ".s",
-        ".cpp",
-        ".cs",
-        ".js",
-	".fs",
-	".java",
-        ".html",
-        ".cshtml",
-        ".razor",
-        ".razor.cs",
-	".css",
-        ".go",
-        ".py",
-        ".swift",
-        ".ps1"
-    ],
-    "exclusions": [
-        ".exe",
-        ".bin",
-        ".obj",
-        ".o",
-        ".dll",
-	".g.cs",
-	".gif",
-	".png",
-	".jpg",
-	".jpeg",
-	".wav",
-	".mov"
-    ]
+  "extensions": [
+    ".c",
+    ".s",
+    ".cpp",
+    ".cs",
+    ".js",
+    ".fs",
+    ".java",
+    ".html",
+    ".cshtml",
+    ".razor",
+    ".razor.cs",
+    ".css",
+    ".go",
+    ".py",
+    ".swift",
+    ".ps1"
+  ],
+  "exclusions": [
+    ".exe",
+    ".bin",
+    ".obj",
+    ".o",
+    ".dll",
+    ".g.cs",
+    ".gif",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".wav",
+    ".mov"
+  ]
 }

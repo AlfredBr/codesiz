@@ -106,6 +106,7 @@ func main() {
 	jsonOutput := flag.Bool("j", false, "save output as JSON to file")
 	includeLang := flag.String("i", "", "include only this language type (extension)")
 	excludeLang := flag.String("e", "", "exclude this language type (extension)")
+	kFlag := flag.Int("k", 0, "exclude largest n files") // NEW - added new flag
 	flag.Parse()
 
 	// If help flag is provided, print usage and exit
@@ -187,6 +188,24 @@ func main() {
 		return nil
 	}); err != nil {
 		log.Fatalf("Error walking the path %q: %v", root, err)
+	}
+
+	// NEW: Exclude the largest n files if -k is provided.
+	var excludedFiles []FileData
+	if *kFlag > 0 {
+		sort.Slice(files, func(i, j int) bool { return files[i].LineCount > files[j].LineCount })
+		if *kFlag >= len(files) {
+			fmt.Println("Excluding all files (largest files).")
+			excludedFiles = files
+			files = []FileData{}
+		} else {
+			excludedFiles = files[:*kFlag]
+			files = files[*kFlag:]
+			fmt.Println("Excluding largest files:")
+			for _, fd := range excludedFiles {
+				fmt.Println(" -", fd.Path)
+			}
+		}
 	}
 
 	if len(files) == 0 {

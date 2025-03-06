@@ -18,6 +18,8 @@ codesiz is a command-line utility written in Go that analyzes source code file l
 - Language filtering options:
   - `-i` to include only a specific language type (ignores languages.json).
   - `-e` to exclude a specific language file type as defined in languages.json.
+- Additional options:
+  - `-k` to exclude the largest *n* files from the analysis. For example, `-k 1` excludes the largest file, and `-k 2` excludes the two largest files. (The excluded files are displayed separately.)
 
 ## Building
 
