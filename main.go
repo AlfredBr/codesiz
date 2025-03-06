@@ -192,8 +192,8 @@ func main() {
 	if !*allFiles {
 		fmt.Printf("Total sum of lines: %d\n", sumTotal)
 	}
-	fmt.Printf("Largest file: %s (%d lines)\n", largest.Path, largest.LineCount)
 	fmt.Printf("Smallest file: %s (%d lines)\n", smallest.Path, smallest.LineCount)
+	fmt.Printf("Largest file: %s (%d lines)\n", largest.Path, largest.LineCount)
 
 	// Print detailed file list according to flags
 	if *histogram {
