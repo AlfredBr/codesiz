@@ -1,0 +1,18 @@
+{
+    "extensions": [
+        ".c",
+        ".s",
+        ".cpp",
+        ".cs",
+        ".js",
+        ".html",
+        ".cshtml",
+        ".razor",
+        ".razor.cs",
+		".css",
+        ".go",
+        ".py",
+        ".swift",
+        ".ps1"
+    ]
+}
