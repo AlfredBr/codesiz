@@ -120,36 +120,13 @@ func main() {
 	}
 	root := flag.Arg(0)
 
-	// Process language filtering flags
-	allowed := make(map[string]bool)
-	if *includeLang != "" {
-		inc := strings.ToLower(*includeLang)
-		if !strings.HasPrefix(inc, ".") {
-			inc = "." + inc
-		}
-		allowed[inc] = true
-	} else {
-		// load configuration
-		config, err := loadConfig(*configPath)
+	// Remove allowed map logic and load config only when needed.
+	var config *Config
+	if *includeLang == "" {
+		var err error
+		config, err = loadConfig(*configPath)
 		if err != nil {
 			log.Fatalf("Unable to load config: %v", err)
-		}
-		// Add allowed extensions from config.Extensions
-		for _, ext := range config.Extensions {
-			allowed[strings.ToLower(ext)] = true
-		}
-		// Remove exclusions from the allowed list
-		for _, exc := range config.Exclusions {
-			allowed[strings.ToLower(exc)] = false // or simply delete below
-			delete(allowed, strings.ToLower(exc))
-		}
-		// Process exclude flag only if include flag is not specified
-		if *excludeLang != "" {
-			exc := strings.ToLower(*excludeLang)
-			if !strings.HasPrefix(exc, ".") {
-				exc = "." + exc
-			}
-			delete(allowed, exc)
 		}
 	}
 
@@ -163,15 +140,42 @@ func main() {
 		}
 		if !*allFiles {
 			lowerName := strings.ToLower(d.Name())
-			match := false
-			for ext := range allowed {
-				if strings.HasSuffix(lowerName, ext) {
-					match = true
-					break
+			// Check exclude flag if provided.
+			if *excludeLang != "" {
+				exc := strings.ToLower(*excludeLang)
+				if !strings.HasPrefix(exc, ".") {
+					exc = "." + exc
+				}
+				if strings.HasSuffix(lowerName, exc) {
+					return nil
 				}
 			}
-			if !match {
-				return nil
+			if *includeLang != "" {
+				inc := strings.ToLower(*includeLang)
+				if !strings.HasPrefix(inc, ".") {
+					inc = "." + inc
+				}
+				if !strings.HasSuffix(lowerName, inc) {
+					return nil
+				}
+			} else {
+				// First, exclude files with any exclusion extension.
+				for _, exc := range config.Exclusions {
+					if strings.HasSuffix(lowerName, strings.ToLower(exc)) {
+						return nil
+					}
+				}
+				// Then, check if file name matches any allowed extension.
+				allowFlag := false
+				for _, ext := range config.Extensions {
+					if strings.HasSuffix(lowerName, strings.ToLower(ext)) {
+						allowFlag = true
+						break
+					}
+				}
+				if !allowFlag {
+					return nil
+				}
 			}
 		}
 		lines, err := countLines(path)
