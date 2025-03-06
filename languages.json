@@ -23,6 +23,12 @@
         ".obj",
         ".o",
         ".dll",
-	".g.cs"
+	".g.cs",
+	".gif",
+	".png",
+	".jpg",
+	".jpeg",
+	".wav",
+	".mov"
     ]
 }
