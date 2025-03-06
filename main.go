@@ -102,6 +102,7 @@ func main() {
 	allFiles := flag.Bool("a", false, "all files, not just source code")
 	helpFlag := flag.Bool("?", false, "print help")
 	configPath := flag.String("config", "languages.json", "config file with file extensions")
+	jsonOutput := flag.Bool("j", false, "save output as JSON to file") // NEW flag
 	flag.Parse()
 
 	// If help flag is provided, print usage and exit
@@ -180,6 +181,59 @@ func main() {
 	sumTotal := 0
 	for _, count := range sizes {
 		sumTotal += count
+	}
+
+	// NEW: JSON output handling
+	if *jsonOutput {
+		output := struct {
+			TotalFiles   int        `json:"total_files"`
+			Average      float64    `json:"average"`
+			Median       float64    `json:"median"`
+			StdDevHigh   float64    `json:"std_dev_high"`
+			StdDevLow    float64    `json:"std_dev_low"`
+			TotalSum     *int       `json:"total_sum,omitempty"`
+			SmallestFile FileData   `json:"smallest_file"`
+			LargestFile  FileData   `json:"largest_file"`
+			Files        []FileData `json:"files,omitempty"`
+		}{
+			TotalFiles:   len(files),
+			Average:      avg,
+			Median:       median,
+			StdDevHigh:   stdHigh,
+			StdDevLow:    stdLow,
+			SmallestFile: smallest,
+			LargestFile:  largest,
+		}
+		if !*allFiles {
+			output.TotalSum = &sumTotal
+		}
+		if *detailed || *sorted || *histogram {
+			var jsonFiles []FileData
+			if *sorted || *histogram {
+				jsonFiles = make([]FileData, len(files))
+				copy(jsonFiles, files)
+				sort.Slice(jsonFiles, func(i, j int) bool {
+					return jsonFiles[i].LineCount < jsonFiles[j].LineCount
+				})
+			} else {
+				jsonFiles = files
+			}
+			output.Files = jsonFiles
+		}
+		folderName := filepath.Base(root)
+		jsonFileName := folderName + ".codesiz.json"
+		f, err := os.Create(jsonFileName)
+		if err != nil {
+			log.Fatalf("Unable to create JSON file: %v", err)
+		}
+		defer f.Close()
+		encoder := json.NewEncoder(f)
+		encoder.SetIndent("", "  ")
+		if err := encoder.Encode(output); err != nil {
+			log.Fatalf("Error encoding JSON: %v", err)
+		}
+		fmt.Printf("JSON output saved to %s\n", jsonFileName)
+		return
 	}
 
 	// display results

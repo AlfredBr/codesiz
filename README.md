@@ -13,6 +13,7 @@ codesiz is a command-line utility written in Go that analyzes source code file l
   - `-s` for sorted output (smallest to largest).
   - `-h` for a graphical histogram representation.
   - `-a` to analyze all files (not just those matching configured extensions).
+  - `-j` for JSON output of the analysis results.
   - `-?` help / usage information.
 
 ## Building
