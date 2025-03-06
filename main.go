@@ -207,9 +207,10 @@ func main() {
 		if !*allFiles {
 			output.TotalSum = &sumTotal
 		}
-		if *detailed || *sorted || *histogram {
+		// Add file list only if detailed or sorted (ignore histogram)
+		if *detailed || *sorted {
 			var jsonFiles []FileData
-			if *sorted || *histogram {
+			if *sorted {
 				jsonFiles = make([]FileData, len(files))
 				copy(jsonFiles, files)
 				sort.Slice(jsonFiles, func(i, j int) bool {
