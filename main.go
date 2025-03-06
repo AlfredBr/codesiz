@@ -305,7 +305,7 @@ func main() {
 	fmt.Printf("Smallest file: %s (%d lines)\n", smallest.Path, smallest.LineCount)
 	fmt.Printf("Largest file: %s (%d lines)\n", largest.Path, largest.LineCount)
 
-	// NEW: Compute file clusters based on line counts.
+	// Compute file clusters based on line counts.
 	{
 		// Create a sorted copy for clustering.
 		clusterFiles := make([]FileData, len(files))
