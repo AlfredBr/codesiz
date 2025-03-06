@@ -4,10 +4,12 @@ codesiz is a command-line utility written in Go that analyzes source code file l
 
 ![Codesiz](./codesiz.png)
 
+![Clustering](./clustering.png)
+
 ## Features
 - Recursively scans directories for files.
 - Configurable file extensions via an external JSON configuration.
-- Computes statistics such as total files, total lines, average lines, median lines, largest/smallest file size, and standard deviations.
+- Computes statistics such as total files, total lines, average lines, median lines, largest/smallest file size, k-means clustering and standard deviations.
 - Output options:
   - `-?` help / usage information.
   - `-l` for detailed listing.
