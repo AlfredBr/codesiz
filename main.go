@@ -294,13 +294,13 @@ func main() {
 
 	// Display results
 	fmt.Printf("Total files analyzed: %d\n", len(files))
-	fmt.Printf("Average lines: %.2f\n", avg)
-	fmt.Printf("Median lines: %.2f\n", median)
+	fmt.Printf("Average: %.2f lines\n", avg)
+	fmt.Printf("Median: %.2f lines\n", median)
 	fmt.Printf("Standard deviation (high): %.2f\n", stdHigh)
 	fmt.Printf("Standard deviation (low): %.2f\n", stdLow)
 	// Show sum total only when -a is not specified.
 	if !*allFiles {
-		fmt.Printf("Total sum of lines: %d\n", sumTotal)
+		fmt.Printf("Total sum: %d lines\n", sumTotal)
 	}
 	fmt.Printf("Smallest file: %s (%d lines)\n", smallest.Path, smallest.LineCount)
 	fmt.Printf("Largest file: %s (%d lines)\n", largest.Path, largest.LineCount)
