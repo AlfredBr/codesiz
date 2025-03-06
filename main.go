@@ -240,16 +240,146 @@ func main() {
 
 	// JSON output handling
 	if *jsonOutput {
+		// NEW: Compute cluster results for JSON output.
+		var clusterResults []struct {
+			Label      string     `json:"label"`
+			Count      int        `json:"count"`
+			Percentage float64    `json:"percentage"`
+			Avg        float64    `json:"avg"`
+			Range      [2]float64 `json:"range"`
+		}
+		if len(files) >= 3 {
+			k := 3
+			n := len(files)
+			data := make([]float64, n)
+			for i, fd := range files {
+				data[i] = float64(fd.LineCount)
+			}
+			// Initialize centroids using sorted data: min, median, and max.
+			sortedData := make([]float64, n)
+			copy(sortedData, data)
+			sort.Float64s(sortedData)
+			centroids := []float64{sortedData[0], sortedData[n/2], sortedData[n-1]}
+			assignments := make([]int, n)
+			for iter := 0; iter < 10; iter++ {
+				changed := false
+				// Assignment step.
+				for i, x := range data {
+					best := 0
+					bestDist := math.Abs(x - centroids[0])
+					for j := 1; j < k; j++ {
+						d := math.Abs(x - centroids[j])
+						if d < bestDist {
+							bestDist = d
+							best = j
+						}
+					}
+					if assignments[i] != best {
+						assignments[i] = best
+						changed = true
+					}
+				}
+				// Update step.
+				newCentroids := make([]float64, k)
+				counts := make([]int, k)
+				for i, cluster := range assignments {
+					newCentroids[cluster] += data[i]
+					counts[cluster]++
+				}
+				for j := 0; j < k; j++ {
+					if counts[j] > 0 {
+						newCentroids[j] /= float64(counts[j])
+					} else {
+						newCentroids[j] = centroids[j]
+					}
+				}
+				centroids = newCentroids
+				if !changed {
+					break
+				}
+			}
+			// Prepare summaries for each cluster.
+			type cs struct {
+				Count int
+				Sum   float64
+				Min   float64
+				Max   float64
+			}
+			summaries := make([]cs, k)
+			for j := 0; j < k; j++ {
+				summaries[j].Min = 1e9
+				summaries[j].Max = -1
+			}
+			for i, cluster := range assignments {
+				x := data[i]
+				summaries[cluster].Count++
+				summaries[cluster].Sum += x
+				if x < summaries[cluster].Min {
+					summaries[cluster].Min = x
+				}
+				if x > summaries[cluster].Max {
+					summaries[cluster].Max = x
+				}
+			}
+			// Determine labelling by sorting clusters by average.
+			type idxAvg struct {
+				Index int
+				Avg   float64
+			}
+			idxs := make([]idxAvg, k)
+			for j := 0; j < k; j++ {
+				avgVal := 0.0
+				if summaries[j].Count > 0 {
+					avgVal = summaries[j].Sum / float64(summaries[j].Count)
+				}
+				idxs[j] = idxAvg{Index: j, Avg: avgVal}
+			}
+			sort.Slice(idxs, func(i, j int) bool { return idxs[i].Avg < idxs[j].Avg })
+			labels := map[int]string{
+				idxs[0].Index: "Small",
+				idxs[1].Index: "Medium",
+				idxs[2].Index: "Large",
+			}
+			clusterResults = make([]struct {
+				Label      string     `json:"label"`
+				Count      int        `json:"count"`
+				Percentage float64    `json:"percentage"`
+				Avg        float64    `json:"avg"`
+				Range      [2]float64 `json:"range"`
+			}, k)
+			for j := 0; j < k; j++ {
+				avgVal := 0.0
+				if summaries[j].Count > 0 {
+					avgVal = summaries[j].Sum / float64(summaries[j].Count)
+				}
+				perc := 100.0 * float64(summaries[j].Count) / float64(n)
+				clusterResults[j] = struct {
+					Label      string     `json:"label"`
+					Count      int        `json:"count"`
+					Percentage float64    `json:"percentage"`
+					Avg        float64    `json:"avg"`
+					Range      [2]float64 `json:"range"`
+				}{
+					Label:      labels[j],
+					Count:      summaries[j].Count,
+					Percentage: perc,
+					Avg:        math.Round(avgVal),
+					Range:      [2]float64{math.Round(summaries[j].Min), math.Round(summaries[j].Max)},
+				}
+			}
+		}
+
 		output := struct {
-			TotalFiles   int        `json:"total_files"`
-			Average      float64    `json:"average"`
-			Median       float64    `json:"median"`
-			StdDevHigh   float64    `json:"std_dev_high"`
-			StdDevLow    float64    `json:"std_dev_low"`
-			TotalSum     *int       `json:"total_sum,omitempty"`
-			SmallestFile FileData   `json:"smallest_file"`
-			LargestFile  FileData   `json:"largest_file"`
-			Files        []FileData `json:"files,omitempty"`
+			TotalFiles   int         `json:"total_files"`
+			Average      float64     `json:"average"`
+			Median       float64     `json:"median"`
+			StdDevHigh   float64     `json:"std_dev_high"`
+			StdDevLow    float64     `json:"std_dev_low"`
+			TotalSum     *int        `json:"total_sum,omitempty"`
+			SmallestFile FileData    `json:"smallest_file"`
+			LargestFile  FileData    `json:"largest_file"`
+			Files        []FileData  `json:"files,omitempty"`
+			Clusters     interface{} `json:"clusters,omitempty"`
 		}{
 			TotalFiles:   len(files),
 			Average:      avg,
@@ -258,23 +388,29 @@ func main() {
 			StdDevLow:    stdLow,
 			SmallestFile: smallest,
 			LargestFile:  largest,
-		}
-		if !*allFiles {
-			output.TotalSum = &sumTotal
-		}
-		// Add file list only if detailed or sorted (ignore histogram)
-		if *detailed || *sorted {
-			var jsonFiles []FileData
-			if *sorted {
-				jsonFiles = make([]FileData, len(files))
-				copy(jsonFiles, files)
-				sort.Slice(jsonFiles, func(i, j int) bool {
-					return jsonFiles[i].LineCount < jsonFiles[j].LineCount
-				})
-			} else {
-				jsonFiles = files
-			}
-			output.Files = jsonFiles
+			TotalSum: func() *int {
+				if !*allFiles {
+					return &sumTotal
+				}
+				return nil
+			}(),
+			Files: func() []FileData {
+				if *detailed || *sorted {
+					var jsonFiles []FileData
+					if *sorted {
+						jsonFiles = make([]FileData, len(files))
+						copy(jsonFiles, files)
+						sort.Slice(jsonFiles, func(i, j int) bool {
+							return jsonFiles[i].LineCount < jsonFiles[j].LineCount
+						})
+					} else {
+						jsonFiles = files
+					}
+					return jsonFiles
+				}
+				return nil
+			}(),
+			Clusters: clusterResults,
 		}
 		folderName := filepath.Base(root)
 		jsonFileName := folderName + ".codesiz.json"
