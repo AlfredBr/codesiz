@@ -199,7 +199,7 @@ func labelClusters(summaries []ClusterSummary) map[int]string {
 	return labels
 }
 
-// Main Function
+// main Function
 func main() {
 	// Define flags
 	detailed := flag.Bool("l", false, "detailed output")
@@ -226,7 +226,7 @@ func main() {
 	}
 	root := flag.Arg(0)
 
-	// Remove allowed map logic and load config only when needed.
+	// Remove allowed map logic and load config only when needed
 	var config *Config
 	if *includeLang == "" {
 		var err error
@@ -265,13 +265,13 @@ func main() {
 					return nil
 				}
 			} else {
-				// First, exclude files with any exclusion extension.
+				// First, exclude files with any exclusion extension
 				for _, exc := range config.Exclusions {
 					if strings.HasSuffix(lowerName, strings.ToLower(exc)) {
 						return nil
 					}
 				}
-				// Then, check if file name matches any allowed extension.
+				// Then, check if file name matches any allowed extension
 				allowFlag := false
 				for _, ext := range config.Extensions {
 					if strings.HasSuffix(lowerName, strings.ToLower(ext)) {
@@ -295,10 +295,10 @@ func main() {
 		log.Fatalf("Error walking the path %q: %v", root, err)
 	}
 
-	// Exclude the largest n files if -k is provided.
+	// Exclude the largest n files if -k is provided
 	var excludedFiles []FileData
 	if *kFlag > 0 {
-		// sort files smallest to largest so that largest files are at the end
+		// Sort files smallest to largest so that largest files are at the end
 		sort.Slice(files, func(i, j int) bool { return files[i].LineCount < files[j].LineCount })
 		if *kFlag >= len(files) {
 			fmt.Printf("Excluding %d file(s) (largest files).\n", len(files))
@@ -343,7 +343,7 @@ func main() {
 		sumTotal += count
 	}
 
-	// Compute clusters once using k-means if possible.
+	// Compute clusters once using k-means if possible
 	var clusterResults []struct {
 		Label      string     `json:"label"`
 		Count      int        `json:"count"`
@@ -390,7 +390,7 @@ func main() {
 		}
 	}
 
-	// JSON Output section.
+	// JSON Output section
 	if *jsonOutput {
 		output := struct {
 			TotalFiles   int         `json:"total_files"`
@@ -460,7 +460,7 @@ func main() {
 	fmt.Printf("Smallest file: %s (%d lines)\n", smallest.Path, smallest.LineCount)
 	fmt.Printf("Largest file: %s (%d lines)\n", largest.Path, largest.LineCount)
 
-	// Compute file clusters using k-means clustering (k=3) on file line counts.
+	// Compute file clusters using k-means clustering (k=3) on file line counts
 	if len(files) >= 3 {
 		fmt.Println("\nFile clusters (k-means clustering, k=3):")
 		for j := 0; j < 3; j++ {
