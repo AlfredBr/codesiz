@@ -142,6 +142,10 @@ func main() {
 			if !strings.HasPrefix(exc, ".") {
 				exc = "." + exc
 			}
+			// NEW: Check if the language to exclude is defined in languages.json
+			if !allowed[exc] {
+				log.Fatalf("Excluded language %s is not defined in languages.json", exc)
+			}
 			delete(allowed, exc)
 		}
 	}

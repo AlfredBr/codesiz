@@ -5,6 +5,8 @@
         ".cpp",
         ".cs",
         ".js",
+		".fs",
+		".java",
         ".html",
         ".cshtml",
         ".razor",
