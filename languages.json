@@ -5,13 +5,13 @@
         ".cpp",
         ".cs",
         ".js",
-		".fs",
-		".java",
+	".fs",
+	".java",
         ".html",
         ".cshtml",
         ".razor",
         ".razor.cs",
-		".css",
+	".css",
         ".go",
         ".py",
         ".swift",
@@ -23,6 +23,6 @@
         ".obj",
         ".o",
         ".dll",
-		".g.cs"
+	".g.cs"
     ]
 }
