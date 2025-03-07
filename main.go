@@ -256,6 +256,7 @@ func main() {
 					return nil
 				}
 			}
+			// Check include flag if provided.
 			if *includeLang != "" {
 				inc := strings.ToLower(*includeLang)
 				if !strings.HasPrefix(inc, ".") {
