@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	_ "embed"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -13,6 +14,9 @@ import (
 	"sort"
 	"strings"
 )
+
+//go:embed languages.json
+var embeddedConfig []byte
 
 // Types and Helper Functions
 type Config struct {
@@ -34,15 +38,54 @@ type ClusterSummary struct {
 	Avg     float64
 }
 
-func loadConfig(path string) (*Config, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func loadConfigFromBytes(data []byte) (*Config, error) {
 	var config Config
-	err = json.NewDecoder(f).Decode(&config)
+	err := json.Unmarshal(data, &config)
 	return &config, err
+}
+
+func loadConfig(path string) (*Config, error) {
+	// If a custom config path is provided and it exists, use it
+	if path != "languages.json" && fileExists(path) {
+		f, err := os.Open(path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open custom config file %s: %w", path, err)
+		}
+		defer f.Close()
+		var config Config
+		err = json.NewDecoder(f).Decode(&config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse custom config file %s: %w", path, err)
+		}
+		return &config, nil
+	}
+
+	// Try loading from the default languages.json file
+	if fileExists("languages.json") {
+		f, err := os.Open("languages.json")
+		if err != nil {
+			return nil, fmt.Errorf("failed to open default config file: %w", err)
+		}
+		defer f.Close()
+		var config Config
+		err = json.NewDecoder(f).Decode(&config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse default config file: %w", err)
+		}
+		return &config, nil
+	}
+
+	// Fall back to embedded configuration
+	config, err := loadConfigFromBytes(embeddedConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load embedded config: %w", err)
+	}
+	return config, nil
 }
 
 func countLines(filePath string) (int, error) {
