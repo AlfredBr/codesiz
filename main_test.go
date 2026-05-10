@@ -219,6 +219,34 @@ func TestWriteJSONToFile(t *testing.T) {
 	}
 }
 
+func TestWriteHistogramUsesSolidBars(t *testing.T) {
+	result := AnalysisResult{
+		TotalFiles: 2,
+		Files: []FileData{
+			{Path: "small.go", LineCount: 1},
+			{Path: "middle.go", LineCount: 101},
+			{Path: "large.go", LineCount: 202},
+		},
+	}
+
+	var out bytes.Buffer
+	if err := writeResult(&out, Options{Format: "histogram"}, result); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "█") {
+		t.Fatalf("histogram = %q, want solid bar", out.String())
+	}
+	if strings.Contains(out.String(), "#") {
+		t.Fatalf("histogram = %q, should not use hash bars", out.String())
+	}
+	if !strings.Contains(out.String(), "█████████████████████████ 101") {
+		t.Fatalf("histogram = %q, want half-width resolution", out.String())
+	}
+	if !strings.Contains(out.String(), "▎") {
+		t.Fatalf("histogram = %q, want fractional bar glyph", out.String())
+	}
+}
+
 func writeTestFile(t *testing.T, dir, name, content string) {
 	t.Helper()
 	path := filepath.Join(dir, name)

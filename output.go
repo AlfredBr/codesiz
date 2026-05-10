@@ -83,6 +83,7 @@ func writeResult(stdout io.Writer, opts Options, result AnalysisResult) error {
 
 func writeHistogram(stdout io.Writer, files []FileData) {
 	const barWidth = 50
+	barParts := []string{"", "▏", "▎", "▍", "▌", "▋", "▊", "▉"}
 	maxLine := 0
 	maxPathLen := 0
 	for _, fd := range files {
@@ -95,11 +96,11 @@ func writeHistogram(stdout io.Writer, files []FileData) {
 	}
 	fmt.Fprintln(stdout, "Detailed file histogram:")
 	for _, fd := range files {
-		barLen := 0
+		barUnits := 0
 		if maxLine > 0 {
-			barLen = int((float64(fd.LineCount) / float64(maxLine)) * barWidth)
+			barUnits = int(math.Round((float64(fd.LineCount) / float64(maxLine)) * barWidth * 8))
 		}
-		bar := strings.Repeat("#", barLen)
+		bar := strings.Repeat("█", barUnits/8) + barParts[barUnits%8]
 		fmt.Fprintf(stdout, "%-*s: %s %d\n", maxPathLen, fd.Path, bar, fd.LineCount)
 	}
 }
