@@ -24,8 +24,8 @@ func Build() error {
 		outputName = "codesiz.exe"
 	}
 
-	// Build the application
-	return sh.Run("go", "build", "-o", outputName, "main.go")
+	// Build the package so all files in package main are included.
+	return sh.Run("go", "build", "-o", outputName, ".")
 }
 
 // Clean removes build artifacts and temporary files
