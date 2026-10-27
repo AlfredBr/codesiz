@@ -39,6 +39,9 @@ type gitignoreRule struct {
 }
 
 func analyze(opts Options, config *Config) (AnalysisResult, error) {
+	if err := validateRoot(opts.Root); err != nil {
+		return AnalysisResult{}, err
+	}
 	gitignore, err := loadGitignore(opts.Root)
 	if err != nil {
 		return AnalysisResult{}, err

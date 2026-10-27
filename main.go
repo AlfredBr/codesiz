@@ -10,6 +10,8 @@ import (
 )
 
 type Options struct {
+	Discover     bool
+	Init         bool
 	Root         string
 	ConfigPath   string
 	Format       string
@@ -53,6 +55,13 @@ func main() {
 		log.Fatalf("Unable to load config: %v", err)
 	}
 
+	if opts.Discover || opts.Init {
+		if err := runDiscovery(os.Stdout, opts, config); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
 	result, err := analyze(opts, config)
 	if err != nil {
 		log.Fatal(err)
@@ -65,7 +74,7 @@ func main() {
 
 func parseOptions(args []string) (Options, error) {
 	opts := Options{
-		ConfigPath:   "languages.json",
+		Root:         ".",
 		Format:       "text",
 		SortMode:     "none",
 		ShowClusters: true,
@@ -77,11 +86,14 @@ func parseOptions(args []string) (Options, error) {
 	fs := flag.NewFlagSet("codesiz", flag.ContinueOnError)
 	fs.SetOutput(os.Stdout)
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: codesiz [options] <path>")
+		fmt.Fprintln(fs.Output(), "Usage: codesiz [options] [path]")
 		fmt.Fprintln(fs.Output())
 		fmt.Fprintln(fs.Output(), "Options:")
+		fmt.Fprintln(fs.Output(), "  --discover            show file types and selection decisions without reading contents")
+		fmt.Fprintln(fs.Output(), "  --init                save a profile for detected selected types (never overwrite)")
+		fmt.Fprintln(fs.Output(), "                        --output sets its path; default: <path>/codesiz.json")
 		fmt.Fprintln(fs.Output(), "  --all                 scan all regular files instead of profile includes")
-		fmt.Fprintln(fs.Output(), "  --config <file>       scan profile JSON file (default \"languages.json\")")
+		fmt.Fprintln(fs.Output(), "  --config <file>       optional scan profile JSON file (default: built-in)")
 		fmt.Fprintln(fs.Output(), "  --drop-largest <n>    exclude the largest n files from analysis")
 		fmt.Fprintln(fs.Output(), "  --exclude <pattern>   exclude glob pattern; repeat or use commas")
 		fmt.Fprintln(fs.Output(), "  --format <format>     output format: text, json, histogram (default \"text\")")
@@ -95,6 +107,8 @@ func parseOptions(args []string) (Options, error) {
 		fmt.Fprintln(fs.Output(), "  -?                    print help")
 	}
 
+	fs.BoolVar(&opts.Discover, "discover", false, "discover file types")
+	fs.BoolVar(&opts.Init, "init", false, "generate an optional scan profile")
 	fs.StringVar(&opts.ConfigPath, "config", opts.ConfigPath, "scan profile JSON file")
 	fs.StringVar(&opts.Format, "format", opts.Format, "output format: text, json, histogram")
 	fs.StringVar(&opts.OutputPath, "output", "", "write output to a file instead of stdout")
@@ -118,14 +132,14 @@ func parseOptions(args []string) (Options, error) {
 	if err := fs.Parse(args); err != nil {
 		return opts, err
 	}
-	if fs.NArg() < 1 {
-		return opts, fmt.Errorf("please provide a folder name")
-	}
+
 	if fs.NArg() > 1 {
 		return opts, fmt.Errorf("expected one folder argument, got %d", fs.NArg())
 	}
 
-	opts.Root = fs.Arg(0)
+	if fs.NArg() == 1 {
+		opts.Root = fs.Arg(0)
+	}
 	opts.Include = includes
 	opts.Exclude = excludes
 	opts.ShowClusters = !noClusters
@@ -144,6 +158,14 @@ func parseOptions(args []string) (Options, error) {
 	}
 	if opts.DropLargest < 0 {
 		return opts, fmt.Errorf("--drop-largest cannot be negative")
+	}
+	if opts.Discover || opts.Init {
+		if opts.Format != "text" || opts.ListFiles || opts.DropLargest != 0 || opts.AllFiles {
+			return opts, fmt.Errorf("--discover/--init cannot be combined with --format, --histogram, --list, --drop-largest, or --all")
+		}
+		if opts.Discover && !opts.Init && opts.OutputPath != "" {
+			return opts, fmt.Errorf("--output with discovery requires --init")
+		}
 	}
 	if opts.Format == "histogram" {
 		opts.ListFiles = true

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,52 +19,37 @@ type Config struct {
 	Exclude []string `json:"exclude"`
 }
 
-func fileExists(filePath string) bool {
-	_, err := os.Stat(filePath)
-	return err == nil
-}
-
 func loadConfigFromBytes(data []byte) (*Config, error) {
-	var config Config
-	if err := json.Unmarshal(data, &config); err != nil {
+	var config *Config
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&config); err != nil {
 		return nil, err
 	}
+	if config == nil {
+		return nil, fmt.Errorf("profile must be a JSON object")
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		return nil, fmt.Errorf("profile must contain exactly one JSON object")
+	}
 	config.normalize()
-	return &config, nil
+	if len(config.Include) == 0 {
+		return nil, fmt.Errorf("profile must contain at least one include pattern; use --all to scan all file types")
+	}
+	return config, nil
 }
 
 func loadConfig(filePath string) (*Config, error) {
-	if filePath != "languages.json" && fileExists(filePath) {
-		f, err := os.Open(filePath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open custom config file %s: %w", filePath, err)
-		}
-		defer f.Close()
-		var config Config
-		if err := json.NewDecoder(f).Decode(&config); err != nil {
-			return nil, fmt.Errorf("failed to parse custom config file %s: %w", filePath, err)
-		}
-		config.normalize()
-		return &config, nil
+	if filePath == "" {
+		return loadConfigFromBytes(embeddedConfig)
 	}
-
-	if fileExists("languages.json") {
-		f, err := os.Open("languages.json")
-		if err != nil {
-			return nil, fmt.Errorf("failed to open default config file: %w", err)
-		}
-		defer f.Close()
-		var config Config
-		if err := json.NewDecoder(f).Decode(&config); err != nil {
-			return nil, fmt.Errorf("failed to parse default config file: %w", err)
-		}
-		config.normalize()
-		return &config, nil
-	}
-
-	config, err := loadConfigFromBytes(embeddedConfig)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load embedded config: %w", err)
+		return nil, fmt.Errorf("read profile %q: %w", filePath, err)
+	}
+	config, err := loadConfigFromBytes(data)
+	if err != nil {
+		return nil, fmt.Errorf("parse profile %q: %w", filePath, err)
 	}
 	return config, nil
 }
